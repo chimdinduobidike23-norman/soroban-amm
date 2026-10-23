@@ -279,9 +279,7 @@ impl TwalConsumer {
     /// Return the pending keeper nominee, or `None` when no transfer is active.
     pub fn get_pending_keeper(env: Env) -> Option<Address> {
         Self::extend_ttl(&env);
-        env.storage()
-            .instance()
-            .get(&DataKey::PendingKeeper)
+        env.storage().instance().get(&DataKey::PendingKeeper)
     }
 
     /// Replace this contract's WASM. Keeper-only; contract state is preserved.
@@ -2095,7 +2093,10 @@ mod tests {
         env.ledger().with_mut(|l| l.timestamp = 10_200);
         consumer.save_snapshot(&amm_addr);
         let removed_cumulative = env.as_contract(&consumer.address, || {
-            TwalConsumer::load_snapshots(&env, &amm_addr).get(1).unwrap().1
+            TwalConsumer::load_snapshots(&env, &amm_addr)
+                .get(1)
+                .unwrap()
+                .1
         });
         consumer.delete_snapshot(&amm_addr, &10_100_u64);
 
@@ -2151,7 +2152,8 @@ mod tests {
         let consumer = TwalConsumerClient::new(&env, &consumer_addr);
         consumer.initialize(&keeper);
 
-        let (version, data): (u32, Address) =
+        // The payload is the one-element tuple `(keeper,)`.
+        let (version, (data,)): (u32, (Address,)) =
             last_versioned_event(&env, &consumer_addr, "initialized");
         assert_eq!(version, soroban_amm_sdk::EVENT_SCHEMA_VERSION);
         assert_eq!(data, keeper);
@@ -2165,7 +2167,9 @@ mod tests {
         let consumer = TwalConsumerClient::new(&env, &consumer_addr);
         consumer.initialize(&keeper);
 
-        assert!(consumer.try_propose_keeper(&Address::generate(&env)).is_err());
+        assert!(consumer
+            .try_propose_keeper(&Address::generate(&env))
+            .is_err());
     }
 
     #[test]
@@ -2241,10 +2245,10 @@ mod tests {
         let consumer = TwalConsumerClient::new(&env, &consumer_addr);
         consumer.initialize(&keeper);
         consumer.propose_keeper(&nominee);
-        let (proposal_version, proposed): (u32, Address) =
+        let (proposal_version, (proposed,)): (u32, (Address,)) =
             last_versioned_event(&env, &consumer_addr, "keeper_proposed");
         consumer.accept_keeper(&nominee);
-        let (change_version, changed): (u32, Address) =
+        let (change_version, (changed,)): (u32, (Address,)) =
             last_versioned_event(&env, &consumer_addr, "keeper_changed");
 
         assert_eq!(proposal_version, soroban_amm_sdk::EVENT_SCHEMA_VERSION);
@@ -2304,6 +2308,20 @@ mod tests {
         assert_eq!(consumer.get_snapshot_count(&amm_pool), 2);
     }
 
+    /// Upload this contract's own release WASM, built by `build_workspace.sh`
+    /// before `cargo test` (same approach as `router` / `batch_router`).
+    fn upload_own_wasm(env: &Env) -> soroban_sdk::BytesN<32> {
+        env.budget().reset_unlimited();
+        let wasm = soroban_sdk::Bytes::from_slice(
+            env,
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../target/wasm32v1-none/release/twal_consumer.wasm"
+            )),
+        );
+        env.deployer().upload_contract_wasm(wasm)
+    }
+
     #[test]
     fn upgrade_rejects_non_keeper() {
         let env = Env::default();
@@ -2311,7 +2329,7 @@ mod tests {
         let consumer_addr = env.register_contract(None, TwalConsumer);
         let consumer = TwalConsumerClient::new(&env, &consumer_addr);
         consumer.initialize(&keeper);
-        let wasm_hash = env.deployer().upload_contract_wasm(crate::WASM);
+        let wasm_hash = upload_own_wasm(&env);
 
         assert!(consumer.try_upgrade(&wasm_hash).is_err());
     }
@@ -2327,7 +2345,7 @@ mod tests {
         let consumer = TwalConsumerClient::new(&env, &consumer_addr);
         consumer.initialize(&keeper);
         consumer.save_snapshot(&pool);
-        let wasm_hash = env.deployer().upload_contract_wasm(crate::WASM);
+        let wasm_hash = upload_own_wasm(&env);
 
         consumer.upgrade(&wasm_hash);
 
