@@ -11,8 +11,7 @@
 
 use soroban_amm_sdk::emit_versioned_event;
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, symbol_short, Address, BytesN, Env,
-    Vec,
+    contract, contracterror, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Vec,
 };
 
 // ── WASM bytes for test harness ──────────────────────────────────────────────
@@ -1025,7 +1024,10 @@ mod tests {
         let client = ClPositionNftClient::new(&env, &contract_id);
         let address = Address::generate(&env);
         assert_eq!(
-            client.try_initialize(&address, &address).unwrap_err().unwrap(),
+            client
+                .try_initialize(&address, &address)
+                .unwrap_err()
+                .unwrap(),
             NftError::InvalidAddress
         );
     }
@@ -1271,7 +1273,7 @@ mod tests {
 
     #[test]
     fn receiver_accepts_transfers_by_default() {
-        let (env, client, _admin, pool, _user) = setup();
+        let (env, client, _admin, _pool, _user) = setup();
         let receiver = Address::generate(&env);
         assert!(client.accepts_transfers(&receiver));
     }
@@ -1477,7 +1479,10 @@ mod tests {
     #[test]
     #[should_panic]
     fn old_pool_cannot_mint_after_pool_replacement() {
-        use soroban_sdk::{testutils::{MockAuth, MockAuthInvoke}, IntoVal};
+        use soroban_sdk::{
+            testutils::{MockAuth, MockAuthInvoke},
+            IntoVal,
+        };
 
         let (env, client, admin, old_pool, owner) = setup();
         let new_pool = Address::generate(&env);
@@ -1496,7 +1501,10 @@ mod tests {
 
     #[test]
     fn new_pool_can_mint_after_pool_replacement() {
-        use soroban_sdk::{testutils::{MockAuth, MockAuthInvoke}, IntoVal};
+        use soroban_sdk::{
+            testutils::{MockAuth, MockAuthInvoke},
+            IntoVal,
+        };
 
         let (env, client, admin, _old_pool, owner) = setup();
         let new_pool = Address::generate(&env);
@@ -1566,13 +1574,20 @@ mod tests {
 
     #[test]
     fn transfer_bumps_owner_metadata_and_instance_ttls() {
-        use soroban_sdk::testutils::Ledger as _;
+        use soroban_sdk::testutils::{
+            storage::{Instance as _, Persistent as _},
+            Ledger as _,
+        };
 
         let (env, client, _admin, pool, owner) = setup();
-        client.set_ttl_params(&100, &1_000);
+        // `extend_ttl` is a no-op while the TTL is above `min_ttl`, and a fresh
+        // test instance starts around 4_095 ledgers, so the threshold has to sit
+        // above that for the first bump to fire.
+        client.set_ttl_params(&5_000, &10_000);
         let recipient = Address::generate(&env);
         let id = client.mint(&owner, &pool, &-100, &100);
-        env.ledger().with_mut(|ledger| ledger.sequence_number += 950);
+        env.ledger()
+            .with_mut(|ledger| ledger.sequence_number += 9_000);
 
         client.transfer(&owner, &owner, &recipient, &id);
 
@@ -1581,13 +1596,16 @@ mod tests {
                 env.storage()
                     .persistent()
                     .get_ttl(&DataKey::TokenPosition(id)),
-                1_000
+                10_000
             );
             assert_eq!(
                 env.storage().persistent().get_ttl(&DataKey::Owner(id)),
-                1_000
+                10_000
             );
-            assert_eq!(env.storage().instance().get_ttl(), 1_000);
+            // `initialize` already bumped the instance to the (much larger)
+            // default, and `extend_ttl` never shortens, so the instance can only
+            // be asserted to be at least the configured bump.
+            assert!(env.storage().instance().get_ttl() >= 10_000);
         });
     }
 
