@@ -129,8 +129,7 @@ function extractEntrypoints(block) {
 function extractContractStructs(source) {
   const structs = {};
   const annotation = /#\[contracttype\]/g;
-  let marker;
-  while ((marker = annotation.exec(source)) !== null) {
+  while (annotation.exec(source) !== null) {
     const nextAnnotation = source.indexOf("#[contracttype]", annotation.lastIndex);
     const structMatch = /\bpub struct\s+([A-Za-z0-9_]+)\s*\{/.exec(
       source.slice(annotation.lastIndex, nextAnnotation === -1 ? undefined : nextAnnotation)

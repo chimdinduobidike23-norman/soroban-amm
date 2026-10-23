@@ -163,7 +163,7 @@ export class AmmPool {
       this.simulate("get_info"),
       this.simulate("is_paused"),
     ]);
-    const paused = scValToNative(pausedRaw);
+    const paused: unknown = scValToNative(pausedRaw);
     if (typeof paused !== "boolean") {
       throw new TypeError(`expected a boolean contract value for is_paused, got ${typeof paused}`);
     }
