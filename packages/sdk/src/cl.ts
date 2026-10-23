@@ -155,16 +155,21 @@ export class ConcentratedLiquidityClient {
   async getPosition(owner: string, lowerTick: number, upperTick: number): Promise<Position> {
     const raw = await this.simulate("get_position", addr(owner), i32(lowerTick), i32(upperTick));
     const native = scValToNative(raw) as Record<string, unknown>;
+    const posLower = Number(requireBigInt(native, "lower_tick", "Position"));
+    const posUpper = Number(requireBigInt(native, "upper_tick", "Position"));
+    const liquidity = requireBigInt(native, "liquidity", "Position");
+    const feeGrowthInsideA = requireBigInt(native, "fee_growth_inside_a", "Position");
+    const feeGrowthInsideB = requireBigInt(native, "fee_growth_inside_b", "Position");
     const owed = native.tokens_owed;
     if (!Array.isArray(owed) || owed.length !== 2) {
       throw new ContractDecodeError("Position", "tokens_owed", Object.keys(native));
     }
     return {
-      lowerTick: Number(requireBigInt(native, "lower_tick", "Position")),
-      upperTick: Number(requireBigInt(native, "upper_tick", "Position")),
-      liquidity: requireBigInt(native, "liquidity", "Position"),
-      feeGrowthInsideA: requireBigInt(native, "fee_growth_inside_a", "Position"),
-      feeGrowthInsideB: requireBigInt(native, "fee_growth_inside_b", "Position"),
+      lowerTick: posLower,
+      upperTick: posUpper,
+      liquidity,
+      feeGrowthInsideA,
+      feeGrowthInsideB,
       tokensOwedA: toBigInt(owed?.[0]),
       tokensOwedB: toBigInt(owed?.[1]),
     };
